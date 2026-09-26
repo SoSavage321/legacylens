@@ -151,11 +151,87 @@
   ],
   "selectedId": "fix-formatbytes-typo",
   "blastRadius": {
-    "changedFiles": [],
-    "directDependents": [],
-    "indirectImpact": [],
-    "risks": [],
-    "validation": [],
-    "rollback": ""
+    "changedFiles": [
+      "src/lib/utils.ts"
+    ],
+    "directDependents": [
+      {
+        "path": "src/components/file-uploader.tsx",
+        "lines": [238, 291],
+        "note": "Only consumer of formatBytes; all three call sites use default sizeType='normal', so the accurateSizes fallback (the typo'd branch) is never reached at runtime"
+      }
+    ],
+    "indirectImpact": [
+      {
+        "text": "create-product-form uses FileUploader — no runtime impact because the accurate branch is unreachable",
+        "basis": "observed",
+        "evidence": [
+          {
+            "path": "src/app/(dashboard)/store/[storeId]/products/new/_components/create-product-form.tsx",
+            "lines": [47, 47],
+            "note": "Imports FileUploader from @/components/file-uploader"
+          }
+        ]
+      },
+      {
+        "text": "update-product-form uses FileUploader — no runtime impact for the same reason",
+        "basis": "observed",
+        "evidence": [
+          {
+            "path": "src/app/(dashboard)/store/[storeId]/products/[productId]/_components/update-product-form.tsx",
+            "lines": [49, 49],
+            "note": "Imports FileUploader from @/components/file-uploader"
+          }
+        ]
+      }
+    ],
+    "risks": [
+      {
+        "text": "Zero runtime risk: the 'accurate' branch of formatBytes is dead code — no call site anywhere in the codebase passes sizeType='accurate'",
+        "basis": "observed",
+        "evidence": [
+          {
+            "path": "src/lib/utils.ts",
+            "lines": [60, 64],
+            "note": "sizeType defaults to 'normal'; grep for formatBytes(.*accurate returns zero matches"
+          }
+        ]
+      },
+      {
+        "text": "Theoretical: if a future caller passes sizeType='accurate' and bytes is large enough for i to exceed array bounds (impossible with a 5-element array), the fallback fires — correcting it to 'Bytes' is semantically correct",
+        "basis": "inferred",
+        "evidence": [
+          {
+            "path": "src/lib/utils.ts",
+            "lines": [57, 62],
+            "note": "accurateSizes has 5 elements; i = floor(log(bytes)/log(1024)) can reach at most 4 for any representable JS number"
+          }
+        ]
+      }
+    ],
+    "validation": [
+      {
+        "command": "pnpm lint",
+        "env": "SKIP_ENV_VALIDATION=1 or .env.example values",
+        "expected": "Exit 0, no ESLint errors or new warnings",
+        "result": "not_run",
+        "log": ""
+      },
+      {
+        "command": "pnpm typecheck",
+        "env": "SKIP_ENV_VALIDATION=1 or .env.example values",
+        "expected": "Exit 0, tsc --noEmit reports no errors",
+        "result": "not_run",
+        "log": ""
+      },
+      {
+        "command": "pnpm format:check",
+        "env": "none required",
+        "expected": "Exit 0, Prettier finds no formatting differences",
+        "result": "not_run",
+        "log": ""
+      }
+    ],
+    "rollback": "git revert HEAD  — or manually restore the single character: change 'Bytes' back to 'Bytest' on src/lib/utils.ts line 62. No migration, no DB change, no side effect to undo."
   }
 }
