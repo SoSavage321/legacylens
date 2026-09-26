@@ -1,0 +1,338 @@
+{
+  "meta": {
+    "schemaVersion": 1,
+    "mock": false,
+    "repoCommit": "e954d54379a7a6f798d3f49ffc6664449220adfc",
+    "generatedBy": {
+      "member": "M2",
+      "bobTask": "B03",
+      "mode": "legacylens"
+    }
+  },
+  "workflows": [
+    {
+      "id": "auth",
+      "name": "Authentication & Route Protection",
+      "actor": "visitor",
+      "summary": "Clerk middleware intercepts every request; any path matching /dashboard(.*) calls auth().protect(), redirecting unauthenticated visitors to /signin and unauthorised users to /dashboard/stores.",
+      "steps": [
+        {
+          "order": 1,
+          "text": "Every incoming request passes through clerkMiddleware defined in src/middleware.ts.",
+          "evidence": [
+            { "path": "src/middleware.ts", "lines": [1, 5], "note": "clerkMiddleware wraps the handler" }
+          ]
+        },
+        {
+          "order": 2,
+          "text": "createRouteMatcher(['/dashboard(.*)']) tests the request URL; only paths under /dashboard are protected — all other routes (lobby, checkout, API) are public.",
+          "evidence": [
+            { "path": "src/middleware.ts", "lines": [3, 3], "note": "isProtectedRoute pattern" }
+          ]
+        },
+        {
+          "order": 3,
+          "text": "For protected routes, auth().protect() is invoked with unauthenticatedUrl='/signin' and unauthorizedUrl='/dashboard/stores', enforcing Clerk session presence.",
+          "evidence": [
+            { "path": "src/middleware.ts", "lines": [9, 12], "note": "protect() call with redirect targets" }
+          ]
+        },
+        {
+          "order": 4,
+          "text": "The middleware matcher covers all pages, root, and api/trpc paths, excluding static assets and _next internals.",
+          "evidence": [
+            { "path": "src/middleware.ts", "lines": [16, 18], "note": "config.matcher array" }
+          ]
+        }
+      ],
+      "externalServices": ["Clerk"],
+      "needsSecretsToRun": true,
+      "basis": "observed"
+    },
+    {
+      "id": "add_to_cart",
+      "name": "Add to Cart",
+      "actor": "visitor",
+      "summary": "A visitor clicks 'Add to cart' from a product card or the product detail page form. The addToCart server action validates input, checks product inventory, then creates or updates a cart row in PostgreSQL, storing items as a JSON column. The cartId is persisted in a cookie.",
+      "steps": [
+        {
+          "order": 1,
+          "text": "Visitor clicks 'Add to cart' on a product card (default variant button) or submits the quantity form on the product detail page.",
+          "evidence": [
+            { "path": "src/components/product-card.tsx", "lines": [85, 95], "note": "Add to cart button in card grid/list view" },
+            { "path": "src/app/(lobby)/product/[productId]/_components/add-to-cart-form.tsx", "lines": [50, 63], "note": "Form submit handler in detail page" }
+          ]
+        },
+        {
+          "order": 2,
+          "text": "Both entry points import and call the addToCart server action with { productId, quantity }.",
+          "evidence": [
+            { "path": "src/components/product-card.tsx", "lines": [10, 10], "note": "import addToCart from @/lib/actions/cart" },
+            { "path": "src/app/(lobby)/product/[productId]/_components/add-to-cart-form.tsx", "lines": [11, 11], "note": "same import" }
+          ]
+        },
+        {
+          "order": 3,
+          "text": "addToCart parses rawInput against cartItemSchema (productId string, quantity ≥ 0) before any DB work.",
+          "evidence": [
+            { "path": "src/lib/actions/cart.ts", "lines": [132, 132], "note": "cartItemSchema.parse(rawInput)" },
+            { "path": "src/lib/validations/cart.ts", "lines": [3, 7], "note": "cartItemSchema definition" }
+          ]
+        },
+        {
+          "order": 4,
+          "text": "The action queries the products table to confirm the product exists and has sufficient inventory before touching the cart.",
+          "evidence": [
+            { "path": "src/lib/actions/cart.ts", "lines": [135, 148], "note": "db.query.products.findFirst — inventory check" }
+          ]
+        },
+        {
+          "order": 5,
+          "text": "If no cartId cookie exists, a new cart row is inserted into the carts table with items=[input] and the returned id is stored as a cookie.",
+          "evidence": [
+            { "path": "src/lib/actions/cart.ts", "lines": [150, 168], "note": "db.insert(carts).values({items:[input]}) + cookie set" }
+          ]
+        },
+        {
+          "order": 6,
+          "text": "If the cookie cartId refers to a closed or expired cart, the stale row is deleted and a new cart is created.",
+          "evidence": [
+            { "path": "src/lib/actions/cart.ts", "lines": [183, 206], "note": "delete stale cart then insert fresh one" }
+          ]
+        },
+        {
+          "order": 7,
+          "text": "If an open cart exists, the items JSON array is mutated in memory (quantity incremented or new item appended) then written back with db.update(carts).set({items}).",
+          "evidence": [
+            { "path": "src/lib/actions/cart.ts", "lines": [208, 224], "note": "in-memory mutation then db.update" }
+          ]
+        },
+        {
+          "order": 8,
+          "text": "revalidatePath('/') is called so the header cart count re-renders on the next request.",
+          "evidence": [
+            { "path": "src/lib/actions/cart.ts", "lines": [225, 225], "note": "revalidatePath call" }
+          ]
+        },
+        {
+          "order": 9,
+          "text": "The action returns { data: cart.items, error: null } on success or { data: null, error: string } on failure — never throws.",
+          "evidence": [
+            { "path": "src/lib/actions/cart.ts", "lines": [231, 236], "note": "catch block returning error shape" }
+          ]
+        }
+      ],
+      "externalServices": [],
+      "needsSecretsToRun": false,
+      "basis": "observed"
+    },
+    {
+      "id": "checkout_payment",
+      "name": "Checkout & Payment",
+      "actor": "customer",
+      "summary": "Customer navigates from cart to a per-store checkout page. The server calls createPaymentIntent to calculate the order total, create a Stripe PaymentIntent (connected account), and store the clientSecret in the carts table. The browser renders Stripe Elements; on submission stripe.confirmPayment redirects to a success page where payment is verified and order records are written by the Stripe webhook.",
+      "steps": [
+        {
+          "order": 1,
+          "text": "Customer visits /cart; CheckoutCard fetches cart items per store via getCart({ storeId }) and renders a link to /checkout/{storeId}.",
+          "evidence": [
+            { "path": "src/app/(checkout)/cart/page.tsx", "lines": [23, 40], "note": "getUniqueStoreIds + CheckoutCard render" },
+            { "path": "src/components/checkout/checkout-card.tsx", "lines": [20, 48], "note": "getCart call and checkout link" }
+          ]
+        },
+        {
+          "order": 2,
+          "text": "The checkout page server component calls getStripeAccount({ storeId }) to verify the seller has a connected Stripe account.",
+          "evidence": [
+            { "path": "src/app/(checkout)/checkout/[storeId]/page.tsx", "lines": [52, 54], "note": "getStripeAccount call" },
+            { "path": "src/lib/actions/stripe.ts", "lines": [127, 201], "note": "getStripeAccount — queries stores + payments, calls stripe.accounts.retrieve" }
+          ]
+        },
+        {
+          "order": 3,
+          "text": "createPaymentIntent is called server-side; it calculates the order total (src/lib/checkout.ts), calls stripe.paymentIntents.create on the seller's connected account, then stores paymentIntentId and clientSecret in the carts table.",
+          "evidence": [
+            { "path": "src/app/(checkout)/checkout/[storeId]/page.tsx", "lines": [58, 61], "note": "createPaymentIntent call, result passed as promise" },
+            { "path": "src/lib/actions/stripe.ts", "lines": [438, 539], "note": "full createPaymentIntent implementation" },
+            { "path": "src/lib/actions/stripe.ts", "lines": [501, 514], "note": "stripe.paymentIntents.create call" },
+            { "path": "src/lib/actions/stripe.ts", "lines": [518, 525], "note": "db.update(carts) storing paymentIntentId + clientSecret" },
+            { "path": "src/lib/checkout.ts", "lines": [7, 7], "note": "order amount calculation utility" }
+          ]
+        },
+        {
+          "order": 4,
+          "text": "CheckoutShell initialises the Stripe Elements provider with the clientSecret; CheckoutForm renders LinkAuthenticationElement, AddressElement, and PaymentElement.",
+          "evidence": [
+            { "path": "src/components/checkout/checkout-shell.tsx", "lines": [41, 60], "note": "Elements provider init with clientSecret" },
+            { "path": "src/components/checkout/checkout-form.tsx", "lines": [109, 122], "note": "Stripe Elements rendered" }
+          ]
+        },
+        {
+          "order": 5,
+          "text": "On form submit, stripe.confirmPayment is called in the browser with a return_url of /checkout/{storeId}/success.",
+          "evidence": [
+            { "path": "src/components/checkout/checkout-form.tsx", "lines": [76, 83], "note": "stripe.confirmPayment call" }
+          ]
+        },
+        {
+          "order": 6,
+          "text": "The success page calls getPaymentIntent to retrieve and verify the Stripe PaymentIntent status is 'succeeded' and the cartId matches.",
+          "evidence": [
+            { "path": "src/app/(checkout)/checkout/[storeId]/success/page.tsx", "lines": [54, 59], "note": "getPaymentIntent call" },
+            { "path": "src/lib/actions/stripe.ts", "lines": [252, 303], "note": "getPaymentIntent — stripe.paymentIntents.retrieve + verification" }
+          ]
+        },
+        {
+          "order": 7,
+          "text": "Stripe asynchronously POSTs a payment_intent.succeeded webhook to /api/webhooks/stripe; the handler inserts into addresses and orders, decrements product inventory, and marks the cart closed=true.",
+          "evidence": [
+            { "path": "src/app/api/webhooks/stripe/route.ts", "lines": [17, 234], "note": "full webhook handler" },
+            { "path": "src/app/api/webhooks/stripe/route.ts", "lines": [109, 219], "note": "payment_intent.succeeded: addresses INSERT, orders INSERT, products UPDATE, carts UPDATE closed=true" }
+          ]
+        },
+        {
+          "order": 8,
+          "text": "If the webhook has not fired by the time the success page loads, getOrderLineItems contains a fallback that manually creates address, order, updates inventory, and closes the cart.",
+          "evidence": [
+            { "path": "src/lib/actions/stripe.ts", "lines": [252, 303], "note": "getPaymentIntent verification path" }
+          ]
+        }
+      ],
+      "externalServices": ["Stripe"],
+      "needsSecretsToRun": true,
+      "basis": "observed"
+    },
+    {
+      "id": "seller_product",
+      "name": "Seller Product Management",
+      "actor": "seller",
+      "summary": "An authenticated seller creates a store via onboarding, optionally connects Stripe, then adds, updates, or deletes products through dashboard pages. Product images are uploaded to Uploadthing before the server action inserts/updates the products table. All mutations revalidate the relevant Next.js cache paths.",
+      "steps": [
+        {
+          "order": 1,
+          "text": "Seller visits /onboarding; Clerk auth() checks userId, redirecting to /signin if absent. The Onboarding component shows the Intro step first.",
+          "evidence": [
+            { "path": "src/app/(dashboard)/onboarding/page.tsx", "lines": [17, 39], "note": "auth() check + Onboarding render" },
+            { "path": "src/app/(dashboard)/onboarding/_components/onboarding.tsx", "lines": [16, 28], "note": "step state machine: intro → create → connect" }
+          ]
+        },
+        {
+          "order": 2,
+          "text": "Seller submits the CreateStore form; createStore server action inserts into the stores table (name, description, userId, slug) and revalidates stores cache tag.",
+          "evidence": [
+            { "path": "src/app/(dashboard)/onboarding/_components/create-store.tsx", "lines": [25, 101], "note": "CreateStore form + createStore() call on submit" },
+            { "path": "src/lib/actions/store.ts", "lines": [21, 52], "note": "db.insert(stores) + revalidateTag" }
+          ]
+        },
+        {
+          "order": 3,
+          "text": "After store creation, the seller is prompted to connect Stripe via ConnectStripe; they may skip to navigate directly to /store/{storeId}.",
+          "evidence": [
+            { "path": "src/app/(dashboard)/onboarding/_components/connect-stripe.tsx", "lines": [16, 72], "note": "ConnectStripe component with skip option" }
+          ]
+        },
+        {
+          "order": 4,
+          "text": "Seller navigates to /dashboard/store/{storeId}/products/new; the page server-fetches categories and subcategories, then renders CreateProductForm.",
+          "evidence": [
+            { "path": "src/app/(dashboard)/store/[storeId]/products/new/page.tsx", "lines": [29, 53], "note": "getCategories + getSubcategories + CreateProductForm render" }
+          ]
+        },
+        {
+          "order": 5,
+          "text": "Seller fills the product form and picks image files; clicking 'Add Product' first uploads files to Uploadthing via the productImage endpoint (max 4 MB, max 3 files, Clerk-authenticated).",
+          "evidence": [
+            { "path": "src/app/(dashboard)/store/[storeId]/products/new/_components/create-product-form.tsx", "lines": [82, 106], "note": "uploadFiles() called before server action" },
+            { "path": "src/app/api/uploadthing/core.ts", "lines": [10, 42], "note": "productImage endpoint with auth middleware" }
+          ]
+        },
+        {
+          "order": 6,
+          "text": "After upload resolves, addProduct server action is called; it checks for duplicate product names, then inserts a new row into the products table (including images as JSON) and revalidates the products path.",
+          "evidence": [
+            { "path": "src/lib/actions/product.ts", "lines": [56, 91], "note": "addProduct: duplicate check + db.insert(products)" }
+          ]
+        },
+        {
+          "order": 7,
+          "text": "Seller visits /dashboard/store/{storeId}/products/{productId}; the page fetches the product row and renders UpdateProductForm pre-populated with existing data including stored images.",
+          "evidence": [
+            { "path": "src/app/(dashboard)/store/[storeId]/products/[productId]/page.tsx", "lines": [32, 65], "note": "db.query.products.findFirst + UpdateProductForm render" }
+          ]
+        },
+        {
+          "order": 8,
+          "text": "Seller submits the update form; same upload-then-action sequence runs: uploadFiles → updateProduct server action verifies ownership then runs db.update(products) and revalidates the product path.",
+          "evidence": [
+            { "path": "src/app/(dashboard)/store/[storeId]/products/[productId]/_components/update-product-form.tsx", "lines": [89, 112], "note": "upload then updateProduct call" },
+            { "path": "src/lib/actions/product.ts", "lines": [93, 128], "note": "updateProduct: ownership check + db.update(products)" }
+          ]
+        },
+        {
+          "order": 9,
+          "text": "Seller clicks 'Delete Product'; deleteProduct server action verifies ownership then runs db.delete(products) and revalidates the products list path.",
+          "evidence": [
+            { "path": "src/app/(dashboard)/store/[storeId]/products/[productId]/_components/update-product-form.tsx", "lines": [297, 333], "note": "delete button + deleteProduct call" },
+            { "path": "src/lib/actions/product.ts", "lines": [165, 195], "note": "deleteProduct: ownership check + db.delete(products)" }
+          ]
+        }
+      ],
+      "externalServices": ["Uploadthing", "Stripe"],
+      "needsSecretsToRun": true,
+      "basis": "observed"
+    },
+    {
+      "id": "data_layer",
+      "name": "Data Layer (DB Client & Schema)",
+      "actor": "developer",
+      "summary": "A single Drizzle ORM client is constructed in src/db/index.ts using the postgres driver and DATABASE_URL from validated env. All table definitions are declared in src/db/schema/ and re-exported through the index barrel. The client is imported project-wide as 'db' to run queries and mutations.",
+      "steps": [
+        {
+          "order": 1,
+          "text": "DATABASE_URL is validated at startup by @t3-oss/env-nextjs in src/env.js; missing or malformed values throw before the server boots.",
+          "evidence": [
+            { "path": "src/env.js", "lines": [1, 76], "note": "env validation schema — DATABASE_URL is a required server var" }
+          ]
+        },
+        {
+          "order": 2,
+          "text": "src/db/index.ts creates a postgres driver client from env.DATABASE_URL, then passes it to drizzle() with the full schema object, exporting the db singleton.",
+          "evidence": [
+            { "path": "src/db/index.ts", "lines": [1, 8], "note": "postgres(env.DATABASE_URL) → drizzle(client, {schema})" }
+          ]
+        },
+        {
+          "order": 3,
+          "text": "src/db/schema/index.ts barrel-exports all 13 table modules: addresses, carts, categories, customers, notifications, orders, payments, products, stocks, stores, subcategories, tags, variants.",
+          "evidence": [
+            { "path": "src/db/schema/index.ts", "lines": [1, 14], "note": "14 export * lines covering all schema modules" }
+          ]
+        },
+        {
+          "order": 4,
+          "text": "Every schema file spreads lifecycleDates (createdAt/updatedAt) into its table and exports Foo/$inferSelect and NewFoo/$inferInsert types.",
+          "evidence": [
+            { "path": "src/db/schema/utils.ts", "lines": [6, 11], "note": "lifecycleDates helper — inferred from AGENTS.md convention" }
+          ]
+        },
+        {
+          "order": 5,
+          "text": "Drizzle config in drizzle.config.ts points the dialect to postgresql, the schema entry to src/db/schema/index.ts, and migrations output to ./drizzle/.",
+          "evidence": [
+            { "path": "drizzle.config.ts", "lines": [4, 10], "note": "dialect, schema, out config keys" }
+          ]
+        },
+        {
+          "order": 6,
+          "text": "All db:* npm scripts are prefixed with dotenv-cli so DATABASE_URL from .env is injected before drizzle-kit runs; direct drizzle-kit invocations without dotenv will fail.",
+          "evidence": [
+            { "path": "package.json", "lines": [18, 24], "note": "dotenv prefix on db:generate, db:push, db:migrate, db:seed scripts" }
+          ]
+        }
+      ],
+      "externalServices": ["PostgreSQL"],
+      "needsSecretsToRun": true,
+      "basis": "observed"
+    }
+  ]
+}

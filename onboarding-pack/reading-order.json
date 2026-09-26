@@ -1,0 +1,156 @@
+{
+  "meta": {
+    "schemaVersion": 1,
+    "mock": false,
+    "repoCommit": "e954d54379a7a6f798d3f49ffc6664449220adfc",
+    "generatedBy": {
+      "member": "M3",
+      "bobTask": "B04",
+      "mode": "legacylens"
+    }
+  },
+  "steps": [
+    {
+      "id": "step_env_config",
+      "order": 1,
+      "title": "Environment & Configuration Bootstrap",
+      "why": "Every runtime path — DB, auth, Stripe, Redis — fails if env vars are absent. Reading src/env.js and .env.example first gives you the complete list of required secrets before you try to run anything.",
+      "paths": [
+        "src/env.js",
+        ".env.example",
+        "next.config.js",
+        "drizzle.config.ts"
+      ],
+      "workflowIds": ["data_layer"],
+      "required": true,
+      "minutes": 10
+    },
+    {
+      "id": "step_data_layer",
+      "order": 2,
+      "title": "Data Layer — DB Client, Schema & Utilities",
+      "why": "Almost every server action and query imports 'db' from src/db/index.ts. Knowing the schema barrel, lifecycleDates convention, and takeFirst helpers prevents confusion when reading any mutation code.",
+      "paths": [
+        "src/db/index.ts",
+        "src/db/schema/index.ts",
+        "src/db/schema/utils.ts",
+        "src/db/utils.ts",
+        "src/lib/id.ts",
+        "src/lib/handle-error.ts"
+      ],
+      "workflowIds": ["data_layer"],
+      "required": true,
+      "minutes": 15
+    },
+    {
+      "id": "step_auth_middleware",
+      "order": 3,
+      "title": "Authentication & Middleware",
+      "why": "src/middleware.ts is the first code executed on every request. Understanding which routes are protected (only /dashboard) versus public prevents security misunderstandings when reading lobby, checkout, or API route code.",
+      "paths": [
+        "src/middleware.ts",
+        "src/app/(auth)/",
+        "src/app/layout.tsx"
+      ],
+      "workflowIds": ["auth"],
+      "required": true,
+      "minutes": 10
+    },
+    {
+      "id": "step_server_actions",
+      "order": 4,
+      "title": "Server Action Conventions",
+      "why": "All mutations follow the same { data, error } return shape enforced by getErrorMessage(). Reading cart.ts end-to-end shows the canonical pattern — validation, DB read, DB write, revalidatePath — used by every other action file.",
+      "paths": [
+        "src/lib/actions/cart.ts",
+        "src/lib/validations/cart.ts",
+        "src/lib/handle-error.ts",
+        "src/lib/id.ts"
+      ],
+      "workflowIds": ["add_to_cart"],
+      "required": true,
+      "minutes": 20
+    },
+    {
+      "id": "step_seller_product",
+      "order": 5,
+      "title": "Seller Dashboard — Store & Product Management",
+      "why": "Seller flows touch the most files: Clerk auth check, onboarding state machine, Uploadthing image upload, and product CRUD actions. Reading these together shows how protected dashboard pages are composed.",
+      "paths": [
+        "src/app/(dashboard)/onboarding/page.tsx",
+        "src/app/(dashboard)/onboarding/_components/onboarding.tsx",
+        "src/app/(dashboard)/onboarding/_components/create-store.tsx",
+        "src/app/(dashboard)/onboarding/_components/connect-stripe.tsx",
+        "src/lib/actions/store.ts",
+        "src/app/api/uploadthing/core.ts",
+        "src/lib/actions/product.ts"
+      ],
+      "workflowIds": ["seller_product"],
+      "required": true,
+      "minutes": 25
+    },
+    {
+      "id": "step_checkout_payment",
+      "order": 6,
+      "title": "Checkout & Stripe Payment Flow",
+      "why": "The checkout workflow is the most complex: it spans four route files, three action functions in stripe.ts, Stripe Elements in the browser, and a webhook handler. Reading the files in URL order (cart → checkout → success → webhook) mirrors the user journey.",
+      "paths": [
+        "src/app/(checkout)/cart/page.tsx",
+        "src/components/checkout/checkout-card.tsx",
+        "src/app/(checkout)/checkout/[storeId]/page.tsx",
+        "src/lib/actions/stripe.ts",
+        "src/lib/checkout.ts",
+        "src/components/checkout/checkout-shell.tsx",
+        "src/components/checkout/checkout-form.tsx",
+        "src/app/(checkout)/checkout/[storeId]/success/page.tsx",
+        "src/app/api/webhooks/stripe/route.ts"
+      ],
+      "workflowIds": ["checkout_payment"],
+      "required": true,
+      "minutes": 35
+    },
+    {
+      "id": "step_query_cache",
+      "order": 7,
+      "title": "Read Queries & Caching Strategy",
+      "why": "Server components call query functions directly. Understanding unstable_cache, the server-only guard, and takeFirst patterns is necessary before writing new query files or debugging stale data.",
+      "paths": [
+        "src/lib/queries/product.ts",
+        "src/lib/queries/",
+        "src/app/(lobby)/page.tsx"
+      ],
+      "workflowIds": ["data_layer", "add_to_cart"],
+      "required": false,
+      "minutes": 15
+    },
+    {
+      "id": "step_ui_routes_layout",
+      "order": 8,
+      "title": "Route Groups, Layouts & Global Providers",
+      "why": "The four route groups (lobby, auth, checkout, dashboard) share no forced coupling beyond the root layout providers (ClerkProvider, ThemeProvider). Skimming each layout clarifies which UI shell each workflow renders inside.",
+      "paths": [
+        "src/app/(lobby)/layout.tsx",
+        "src/app/(dashboard)/dashboard/layout.tsx",
+        "src/components/layouts/site-header.tsx",
+        "src/components/product-card.tsx"
+      ],
+      "workflowIds": ["auth", "add_to_cart", "seller_product"],
+      "required": false,
+      "minutes": 15
+    },
+    {
+      "id": "step_external_services",
+      "order": 9,
+      "title": "External Services & Content Pipeline",
+      "why": "Knowing that Loglib, Resend, and Upstash Redis are wired in (but not central to any workflow) prevents false assumptions about missing features. Contentlayer's MDX pipeline and the revalidate API route round out the full surface area.",
+      "paths": [
+        "src/app/api/revalidate/route.ts",
+        "src/content/",
+        "next.config.js"
+      ],
+      "workflowIds": ["data_layer", "checkout_payment"],
+      "required": false,
+      "minutes": 10
+    }
+  ]
+}

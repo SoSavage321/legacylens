@@ -1,0 +1,161 @@
+{
+  "meta": {
+    "schemaVersion": 1,
+    "mock": false,
+    "repoCommit": "e954d54379a7a6f798d3f49ffc6664449220adfc",
+    "generatedBy": {
+      "member": "LegacyLens Onboarding Analyst",
+      "bobTask": "Propose 3 candidate first tasks for a new contributor, plus up to 2 rejected tasks",
+      "mode": "LegacyLens Onboarding Analyst"
+    }
+  },
+  "candidates": [
+    {
+      "id": "fix-formatbytes-typo",
+      "title": "Fix 'Bytest' typo in formatBytes fallback label",
+      "workflowId": "data_layer",
+      "files": [
+        "src/lib/utils.ts"
+      ],
+      "risk": "low",
+      "validation": [
+        "pnpm lint",
+        "pnpm typecheck",
+        "pnpm format:check"
+      ],
+      "externalDependencyRisk": "none — pure string literal change, no external service involved",
+      "decision": "selected",
+      "reason": "Single character change corrects a misspelled fallback string ('Bytest' → 'Bytes') in the formatBytes utility. Affects one file, one line. The function has no side effects, touches no DB or auth. All three CI checks (lint, typecheck, format) pass with only .env.example placeholder values copied to .env.local.",
+      "evidence": [
+        {
+          "path": "src/lib/utils.ts",
+          "lines": [62, 62],
+          "note": "accurateSizes[i] ?? 'Bytest' — 'Bytest' is a typo; should be 'Bytes'"
+        },
+        {
+          "path": "src/lib/utils.ts",
+          "lines": [51, 65],
+          "note": "Full formatBytes function; only line 62 is wrong"
+        },
+        {
+          "path": ".github/workflows/code-check.yml",
+          "lines": [44, 48],
+          "note": "CI copies .env.example then runs pnpm lint — no real secrets needed"
+        },
+        {
+          "path": ".github/workflows/code-check.yml",
+          "lines": [126, 130],
+          "note": "CI typecheck job also uses placeholder .env; confirms validation works without secrets"
+        }
+      ]
+    },
+    {
+      "id": "fix-duplicate-id-prefix",
+      "title": "Resolve duplicate 'sub' prefix for both category and subscription in generateId",
+      "workflowId": "seller_product",
+      "files": [
+        "src/lib/id.ts"
+      ],
+      "risk": "medium",
+      "validation": [
+        "pnpm typecheck",
+        "pnpm lint"
+      ],
+      "externalDependencyRisk": "none — no external service call; pure constant map change. DB migration not required for the prefix map itself, but generated IDs for existing subscription rows in a live DB would differ from new ones if the prefix changed — low risk for greenfield/dev instances.",
+      "decision": "rejected",
+      "reason": "The collision between 'category' (prefix 'cat', line 6) and 'subscription' (also using prefix 'sub', line 9) is a real bug, but changing the subscription prefix could silently affect ID generation for subscription records in any existing database. The blast radius is uncertain without knowing whether subscription IDs are stored or compared externally (e.g. Stripe metadata). Rejected as a first task; better suited once the contributor understands the data model.",
+      "evidence": [
+        {
+          "path": "src/lib/id.ts",
+          "lines": [3, 14],
+          "note": "prefixes map: 'category' maps to 'cat' (line 6) and 'subscription' maps to 'sub' (line 9), but 'subcategory' also maps to 'sub' (line 7) — two keys share the same prefix value 'sub'"
+        },
+        {
+          "path": "src/lib/id.ts",
+          "lines": [40, 49],
+          "note": "generateId uses prefix lookup; a duplicate 'sub' means category and subcategory IDs are indistinguishable"
+        }
+      ]
+    },
+    {
+      "id": "fix-env-example-comment",
+      "title": "Correct stale /src/env.mjs path reference in .env.example comment",
+      "workflowId": "data_layer",
+      "files": [
+        ".env.example"
+      ],
+      "risk": "low",
+      "validation": [
+        "pnpm format:check"
+      ],
+      "externalDependencyRisk": "none — comment-only change in a non-compiled file",
+      "decision": "rejected",
+      "reason": "The comment on line 9 of .env.example says '/src/env.mjs' but the actual file is src/env.js. This is a meaningful correction for new contributors following the README setup steps, and it is purely cosmetic with zero blast radius. Rejected as a separate task only because it is even smaller than fix-formatbytes-typo and does not exercise any TypeScript or lint tooling — a contributor would learn less from it. Could be bundled with the typo fix.",
+      "evidence": [
+        {
+          "path": ".env.example",
+          "lines": [9, 9],
+          "note": "Comment reads '# ...schema in \"/src/env.mjs\" should be updated' — file does not exist"
+        },
+        {
+          "path": "src/env.js",
+          "lines": [1, 1],
+          "note": "Actual file is src/env.js (observed: import { createEnv } from '@t3-oss/env-nextjs')"
+        },
+        {
+          "path": "README.md",
+          "lines": [53, 53],
+          "note": "README instructs contributors to copy .env.example — they would read the stale comment first"
+        }
+      ]
+    },
+    {
+      "id": "add-store-name-min-message",
+      "title": "Add user-facing error messages to createStoreSchema name min/max validators",
+      "workflowId": "seller_product",
+      "files": [
+        "src/lib/validations/store.ts"
+      ],
+      "risk": "low",
+      "validation": [
+        "pnpm typecheck",
+        "pnpm lint",
+        "pnpm format:check"
+      ],
+      "externalDependencyRisk": "none — Zod schema change only; no DB or auth call needed",
+      "decision": "selected",
+      "reason": "createStoreSchema uses z.string().min(3).max(50) without message strings (lines 7, 39). The parallel createProductSchema (product.ts line 4) already provides a message. Adding matching messages improves UX consistency and is a one-file, zero-runtime-dependency change fully validated by pnpm typecheck.",
+      "evidence": [
+        {
+          "path": "src/lib/validations/store.ts",
+          "lines": [7, 7],
+          "note": "name: z.string().min(3).max(50) — no user-facing error message on min or max"
+        },
+        {
+          "path": "src/lib/validations/store.ts",
+          "lines": [39, 39],
+          "note": "updateStoreSchema has the same pattern without messages"
+        },
+        {
+          "path": "src/lib/validations/product.ts",
+          "lines": [4, 6],
+          "note": "createProductSchema provides message: 'Must be at least 1 character' — establishes the convention to follow"
+        },
+        {
+          "path": ".github/workflows/code-check.yml",
+          "lines": [44, 48],
+          "note": "CI copies .env.example then runs lint — no real secrets needed to validate"
+        }
+      ]
+    }
+  ],
+  "selectedId": "fix-formatbytes-typo",
+  "blastRadius": {
+    "changedFiles": [],
+    "directDependents": [],
+    "indirectImpact": [],
+    "risks": [],
+    "validation": [],
+    "rollback": ""
+  }
+}

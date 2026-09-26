@@ -1,0 +1,196 @@
+{
+  "meta": {
+    "schemaVersion": 1,
+    "mock": false,
+    "repoCommit": "e954d54379a7a6f798d3f49ffc6664449220adfc",
+    "generatedBy": {
+      "member": "M4",
+      "bobTask": "B05",
+      "mode": "legacylens"
+    }
+  },
+  "questions": [
+    {
+      "id": "q01",
+      "workflowId": "auth",
+      "readingStepId": "step_auth_middleware",
+      "prompt": "Which URL pattern does clerkMiddleware protect in src/middleware.ts?",
+      "options": [
+        { "id": "a", "text": "All routes except /api and /trpc" },
+        { "id": "b", "text": "Only /dashboard(.*)" },
+        { "id": "c", "text": "/dashboard(.*) and /checkout(.*)" },
+        { "id": "d", "text": "Every route that is not a static asset" }
+      ],
+      "answerId": "b",
+      "explanation": "createRouteMatcher(['/dashboard(.*)']) at src/middleware.ts line 3 matches only paths under /dashboard. The matcher config (lines 16-18) covers all pages and API routes but the protect() call is conditional — it only fires when isProtectedRoute(req) is true. Checkout, lobby, and API routes are all public.",
+      "evidence": [
+        { "path": "src/middleware.ts", "lines": [3, 13], "note": "isProtectedRoute pattern and conditional protect() call" }
+      ]
+    },
+    {
+      "id": "q02",
+      "workflowId": "auth",
+      "readingStepId": "step_auth_middleware",
+      "prompt": "When an unauthenticated user hits /dashboard/stores, where does auth().protect() redirect them?",
+      "options": [
+        { "id": "a", "text": "/signup" },
+        { "id": "b", "text": "/dashboard/stores" },
+        { "id": "c", "text": "/signin" },
+        { "id": "d", "text": "/" }
+      ],
+      "answerId": "c",
+      "explanation": "auth().protect() at src/middleware.ts lines 9-12 passes unauthenticatedUrl set to `${url.origin}/signin`. Unauthenticated visitors are sent to /signin; /dashboard/stores is the unauthorizedUrl used when a user is authenticated but lacks permission.",
+      "evidence": [
+        { "path": "src/middleware.ts", "lines": [9, 12], "note": "protect() with unauthenticatedUrl='/signin' and unauthorizedUrl='/dashboard/stores'" }
+      ]
+    },
+    {
+      "id": "q03",
+      "workflowId": "add_to_cart",
+      "readingStepId": "step_server_actions",
+      "prompt": "What does the addToCart server action do when the cartId cookie points to a cart where closed = true?",
+      "options": [
+        { "id": "a", "text": "Updates the existing cart row with the new item" },
+        { "id": "b", "text": "Throws an error and returns it to the caller" },
+        { "id": "c", "text": "Deletes the closed cart, inserts a new cart, and sets a fresh cartId cookie" },
+        { "id": "d", "text": "Resets the closed flag to false and appends the item" }
+      ],
+      "answerId": "c",
+      "explanation": "At src/lib/actions/cart.ts lines 189-206, when cart.closed is true the action calls db.delete(carts) on the old row, then db.insert(carts) with the new item, stores the returned id in the cartId cookie, and returns { data, error: null }. It never resets the closed flag.",
+      "evidence": [
+        { "path": "src/lib/actions/cart.ts", "lines": [189, 206], "note": "closed-cart branch: delete then insert fresh cart + set cookie" }
+      ]
+    },
+    {
+      "id": "q04",
+      "workflowId": "add_to_cart",
+      "readingStepId": "step_server_actions",
+      "prompt": "What is the return shape of every server action in this codebase on failure?",
+      "options": [
+        { "id": "a", "text": "Throws an Error that the caller must catch" },
+        { "id": "b", "text": "{ data: null, error: string }" },
+        { "id": "c", "text": "{ success: false, message: string }" },
+        { "id": "d", "text": "{ data: null, error: Error }" }
+      ],
+      "answerId": "b",
+      "explanation": "src/lib/actions/cart.ts lines 231-235 show the canonical catch block: return { data: null, error: getErrorMessage(err) }. getErrorMessage() (src/lib/handle-error.ts) always returns a string. Actions never throw to callers, and there is no 'success' field or Error object in the return shape.",
+      "evidence": [
+        { "path": "src/lib/actions/cart.ts", "lines": [231, 236], "note": "catch block returning { data: null, error: getErrorMessage(err) }" },
+        { "path": "src/lib/handle-error.ts", "lines": [1, 10], "note": "getErrorMessage returns string" }
+      ]
+    },
+    {
+      "id": "q05",
+      "workflowId": "checkout_payment",
+      "readingStepId": "step_checkout_payment",
+      "prompt": "After stripe.paymentIntents.create succeeds, where is the clientSecret stored so the browser can initialise Stripe Elements?",
+      "options": [
+        { "id": "a", "text": "In a signed server-side session cookie" },
+        { "id": "b", "text": "In the carts table row, paymentIntentId and clientSecret columns" },
+        { "id": "c", "text": "In Upstash Redis with a TTL equal to the session expiry" },
+        { "id": "d", "text": "In the orders table alongside the order total" }
+      ],
+      "answerId": "b",
+      "explanation": "src/lib/actions/stripe.ts lines 518-524 show db.update(carts).set({ paymentIntentId: paymentIntent.id, clientSecret: paymentIntent.client_secret }) after the PaymentIntent is created. The server component then reads this value back and passes it to CheckoutShell as a prop.",
+      "evidence": [
+        { "path": "src/lib/actions/stripe.ts", "lines": [518, 525], "note": "db.update(carts) storing paymentIntentId + clientSecret" },
+        { "path": "src/components/checkout/checkout-shell.tsx", "lines": [41, 60], "note": "Elements provider initialised with clientSecret" }
+      ]
+    },
+    {
+      "id": "q06",
+      "workflowId": "checkout_payment",
+      "readingStepId": "step_checkout_payment",
+      "prompt": "Which Stripe event triggers the creation of address and order records in the database?",
+      "options": [
+        { "id": "a", "text": "checkout.session.completed" },
+        { "id": "b", "text": "payment_intent.processing" },
+        { "id": "c", "text": "payment_intent.succeeded" },
+        { "id": "d", "text": "charge.succeeded" }
+      ],
+      "answerId": "c",
+      "explanation": "src/app/api/webhooks/stripe/route.ts lines 109-219 handle the 'payment_intent.succeeded' case. This branch inserts into addresses and orders, decrements product inventory, and marks the cart closed=true. The 'payment_intent.processing' case (line 105) only logs.",
+      "evidence": [
+        { "path": "src/app/api/webhooks/stripe/route.ts", "lines": [109, 120], "note": "case 'payment_intent.succeeded' — order creation branch" },
+        { "path": "src/app/api/webhooks/stripe/route.ts", "lines": [105, 108], "note": "case 'payment_intent.processing' — only logs, no DB writes" }
+      ]
+    },
+    {
+      "id": "q07",
+      "workflowId": "seller_product",
+      "readingStepId": "step_seller_product",
+      "prompt": "Before the addProduct server action inserts a row, what check does it perform?",
+      "options": [
+        { "id": "a", "text": "Verifies the seller's Stripe account is connected" },
+        { "id": "b", "text": "Checks whether another product in the store has the same name" },
+        { "id": "c", "text": "Validates the uploaded image URLs against the UploadThing CDN domain" },
+        { "id": "d", "text": "Confirms the seller's userId matches the storeId owner" }
+      ],
+      "answerId": "b",
+      "explanation": "src/lib/actions/product.ts lines 63-72 query products for a row with eq(products.name, input.name) before inserting. If a match is found it throws 'Product name already taken.' The ownership check exists in updateProduct/deleteProduct (lines 97-100) but not in addProduct.",
+      "evidence": [
+        { "path": "src/lib/actions/product.ts", "lines": [63, 72], "note": "db.query.products.findFirst by name — duplicate name guard" }
+      ]
+    },
+    {
+      "id": "q08",
+      "workflowId": "data_layer",
+      "readingStepId": "step_data_layer",
+      "prompt": "Which npm package is used as the PostgreSQL driver inside the Drizzle ORM setup in this project?",
+      "options": [
+        { "id": "a", "text": "pg (node-postgres)" },
+        { "id": "b", "text": "pg-promise" },
+        { "id": "c", "text": "postgres (postgres-js)" },
+        { "id": "d", "text": "@neondatabase/serverless" }
+      ],
+      "answerId": "c",
+      "explanation": "src/db/index.ts lines 2-3 import drizzle from 'drizzle-orm/postgres-js' and postgres from 'postgres', then call postgres(env.DATABASE_URL). The 'pg' package is listed in package.json but Drizzle does not use it — postgres-js is the actual driver.",
+      "evidence": [
+        { "path": "src/db/index.ts", "lines": [2, 8], "note": "import postgres from 'postgres'; drizzle(client, {schema})" }
+      ]
+    },
+    {
+      "id": "q09",
+      "workflowId": "data_layer",
+      "readingStepId": "step_data_layer",
+      "prompt": "What is the purpose of takeFirstOrThrow() in src/db/utils.ts?",
+      "options": [
+        { "id": "a", "text": "Wraps a Drizzle query in a try-catch and re-throws with a friendly message" },
+        { "id": "b", "text": "Returns the first element of a result array, or throws if it is undefined" },
+        { "id": "c", "text": "Asserts that a query returned exactly one row, throwing if more are found" },
+        { "id": "d", "text": "Returns the first element of an array, or returns null if empty" }
+      ],
+      "answerId": "b",
+      "explanation": "src/db/utils.ts lines 7-15 show takeFirstOrThrow<T>(items: T[]) calls takeFirst (items.at(0)), and throws 'First item not found' if the result is falsy. It does not check for multiple rows or return null — that is takeFirst's behaviour.",
+      "evidence": [
+        { "path": "src/db/utils.ts", "lines": [3, 15], "note": "takeFirst returns at(0); takeFirstOrThrow throws if undefined" }
+      ]
+    },
+    {
+      "id": "q10",
+      "workflowId": "data_layer",
+      "readingStepId": "step_env_config",
+      "prompt": "What happens at application startup if DATABASE_URL is missing from the environment?",
+      "options": [
+        { "id": "a", "text": "The app boots normally; the first DB query throws a connection error" },
+        { "id": "b", "text": "A console warning is printed and the app falls back to SQLite" },
+        { "id": "c", "text": "The @t3-oss/env-nextjs validation in src/env.js throws before the server starts" },
+        { "id": "d", "text": "next build succeeds but next start exits with code 1" }
+      ],
+      "answerId": "c",
+      "explanation": "src/env.js lines 1-76 use createEnv from @t3-oss/env-nextjs, which validates all server vars at import time. DATABASE_URL is a required server variable. A missing value causes validation to throw immediately — the server never reaches route handlers. SKIP_ENV_VALIDATION=1 bypasses this (for CI builds).",
+      "evidence": [
+        { "path": "src/env.js", "lines": [9, 38], "note": "createEnv server schema — DATABASE_URL required" }
+      ]
+    }
+  ],
+  "readiness": {
+    "thresholdPercent": 80,
+    "weights": {
+      "reading": 30,
+      "quiz": 50,
+      "workflows": 20
+    },
+    "requiredWorkflowIds": ["data_layer", "auth", "add_to_cart", "checkout_payment", "seller_product"]
+  }
+}

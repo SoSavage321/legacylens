@@ -1,0 +1,188 @@
+{
+  "meta": {
+    "schemaVersion": 1,
+    "mock": false,
+    "repoCommit": "e954d54379a7a6f798d3f49ffc6664449220adfc",
+    "generatedBy": {
+      "member": "M1",
+      "bobTask": "B02",
+      "mode": "legacylens"
+    }
+  },
+  "layers": [
+    {
+      "id": "ui_routes",
+      "name": "UI / Routes",
+      "summary": "Next.js App Router pages and layouts organised into four route groups: (lobby) public storefront, (auth) sign-in/sign-up flows, (checkout) cart and payment, (dashboard) seller/account management. Global providers live in the root layout.",
+      "paths": [
+        "src/app/layout.tsx",
+        "src/app/(lobby)/",
+        "src/app/(auth)/",
+        "src/app/(checkout)/",
+        "src/app/(dashboard)/",
+        "src/components/layouts/"
+      ],
+      "evidence": [
+        { "path": "src/app/layout.tsx", "lines": [75, 99], "note": "ClerkProvider, ThemeProvider, Toaster, Analytics" },
+        { "path": "src/app/(lobby)/layout.tsx", "lines": [10, 23] },
+        { "path": "src/app/(dashboard)/dashboard/layout.tsx", "lines": [12, 54] },
+        { "path": "src/components/layouts/site-header.tsx", "lines": [14, 30] }
+      ]
+    },
+    {
+      "id": "server_actions",
+      "name": "Server Actions",
+      "summary": "Server-only functions in src/lib/actions/ mutate the database. They always return { data, error } — never throw to the caller. Error strings are produced by getErrorMessage() from src/lib/handle-error.ts.",
+      "paths": [
+        "src/lib/actions/",
+        "src/lib/handle-error.ts",
+        "src/lib/id.ts"
+      ],
+      "evidence": [
+        { "path": "src/lib/handle-error.ts", "lines": [1, 10] },
+        { "path": "src/lib/id.ts", "lines": [1, 10] }
+      ]
+    },
+    {
+      "id": "data",
+      "name": "Data Layer",
+      "summary": "PostgreSQL accessed through Drizzle ORM (postgres-js driver). Schema defines 13 tables. Read queries live in src/lib/queries/ and use unstable_cache. Helpers takeFirst/takeFirstOrThrow replace array indexing.",
+      "paths": [
+        "src/db/",
+        "drizzle.config.ts",
+        "src/lib/queries/"
+      ],
+      "evidence": [
+        { "path": "src/db/index.ts", "lines": [2, 8] },
+        { "path": "drizzle.config.ts", "lines": [4, 10] },
+        { "path": "src/db/schema/index.ts", "lines": [1, 13] },
+        { "path": "src/db/utils.ts", "lines": [3, 15] },
+        { "path": "src/lib/queries/product.ts", "lines": [21, 51] }
+      ]
+    },
+    {
+      "id": "auth",
+      "name": "Auth",
+      "summary": "Clerk handles authentication. Middleware protects only /dashboard(.*); all other routes are public. Signed-out users hitting /dashboard are redirected to /signin.",
+      "paths": [
+        "src/middleware.ts",
+        "src/app/(auth)/"
+      ],
+      "evidence": [
+        { "path": "src/middleware.ts", "lines": [3, 11] },
+        { "path": "src/app/(auth)/layout.tsx", "lines": [7, 49] }
+      ]
+    },
+    {
+      "id": "external_services",
+      "name": "External Services",
+      "summary": "Six third-party services: Stripe (payments/subscriptions), Clerk (identity), UploadThing (file storage on utfs.io CDN), Upstash Redis (caching/rate-limiting), Resend (transactional email), Loglib (analytics). All credentials validated at startup by @t3-oss/env-nextjs.",
+      "paths": [
+        "src/env.js",
+        ".env.example",
+        "src/app/api/webhooks/stripe/route.ts",
+        "src/app/api/revalidate/route.ts"
+      ],
+      "evidence": [
+        { "path": "src/env.js", "lines": [9, 38] },
+        { "path": ".env.example", "lines": [12, 53] },
+        { "path": "next.config.js", "lines": [12, 16], "note": "UploadThing CDN remotePattern utfs.io" }
+      ]
+    },
+    {
+      "id": "content",
+      "name": "Content",
+      "summary": "MDX blog posts processed by Contentlayer from src/content/; types generated into .contentlayer/generated (gitignored). The withContentlayer wrapper integrates with Next.js build.",
+      "paths": [
+        "src/content/",
+        "next.config.js"
+      ],
+      "evidence": [
+        { "path": "next.config.js", "lines": [1, 1], "note": "withContentlayer wrapper" },
+        { "path": "package.json", "lines": [8, 8], "note": "build script: contentlayer build && next build" }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "ui_routes",
+      "to": "server_actions",
+      "label": "calls server actions for mutations",
+      "basis": "observed",
+      "evidence": [
+        { "path": "src/lib/actions/", "lines": [1, 1] },
+        { "path": "src/lib/handle-error.ts", "lines": [1, 10] }
+      ]
+    },
+    {
+      "from": "ui_routes",
+      "to": "data",
+      "label": "calls query functions for reads",
+      "basis": "observed",
+      "evidence": [
+        { "path": "src/lib/queries/product.ts", "lines": [21, 51] },
+        { "path": "src/app/(lobby)/page.tsx", "lines": [10, 32] }
+      ]
+    },
+    {
+      "from": "ui_routes",
+      "to": "auth",
+      "label": "middleware guards /dashboard routes",
+      "basis": "observed",
+      "evidence": [
+        { "path": "src/middleware.ts", "lines": [3, 11] }
+      ]
+    },
+    {
+      "from": "server_actions",
+      "to": "data",
+      "label": "reads/writes via Drizzle ORM",
+      "basis": "observed",
+      "evidence": [
+        { "path": "src/db/index.ts", "lines": [2, 8] },
+        { "path": "src/db/utils.ts", "lines": [3, 15] }
+      ]
+    },
+    {
+      "from": "server_actions",
+      "to": "external_services",
+      "label": "calls Stripe API, Resend, UploadThing",
+      "basis": "observed",
+      "evidence": [
+        { "path": "src/env.js", "lines": [9, 25] },
+        { "path": "src/app/api/webhooks/stripe/route.ts", "lines": [1, 30] }
+      ]
+    },
+    {
+      "from": "auth",
+      "to": "external_services",
+      "label": "Clerk SDK calls Clerk cloud API",
+      "basis": "observed",
+      "evidence": [
+        { "path": "src/env.js", "lines": [13, 14], "note": "CLERK_SECRET_KEY server var" },
+        { "path": "package.json", "lines": [30, 30] }
+      ]
+    },
+    {
+      "from": "data",
+      "to": "external_services",
+      "label": "Upstash Redis used for query caching and rate-limiting",
+      "basis": "observed",
+      "evidence": [
+        { "path": "src/env.js", "lines": [22, 23] },
+        { "path": "package.json", "lines": [64, 65] }
+      ]
+    },
+    {
+      "from": "content",
+      "to": "ui_routes",
+      "label": "Contentlayer-generated types consumed by blog pages",
+      "basis": "observed",
+      "evidence": [
+        { "path": "next.config.js", "lines": [1, 1] },
+        { "path": "package.json", "lines": [8, 8] }
+      ]
+    }
+  ],
+  "mermaid": "graph TD\n  ui_routes[UI / Routes]\n  server_actions[Server Actions]\n  data[Data Layer]\n  auth[Auth]\n  external_services[External Services]\n  content[Content]\n  ui_routes --> server_actions\n  ui_routes --> data\n  ui_routes --> auth\n  server_actions --> data\n  server_actions --> external_services\n  auth --> external_services\n  data --> external_services\n  content --> ui_routes"
+}

@@ -1,0 +1,171 @@
+{
+  "meta": {
+    "schemaVersion": 1,
+    "mock": false,
+    "repoCommit": "e954d54379a7a6f798d3f49ffc6664449220adfc",
+    "generatedBy": {
+      "member": "M1",
+      "bobTask": "B02",
+      "mode": "legacylens"
+    }
+  },
+  "repo": {
+    "name": "skateshop",
+    "url": "https://github.com/sadmann7/skateshop",
+    "licence": "MIT"
+  },
+  "oneLine": "Open-source Next.js 14 e-commerce platform for selling skateboarding products, supporting multi-store sellers, Stripe payments, Clerk auth, and an MDX blog.",
+  "stack": [
+    {
+      "text": "Framework: Next.js 14.2.5 (App Router) with TypeScript, using route groups for auth, checkout, dashboard, and public lobby.",
+      "basis": "observed",
+      "evidence": [
+        { "path": "package.json", "lines": [78, 78], "note": "\"next\": \"14.2.5\"" },
+        { "path": "src/app/(lobby)/layout.tsx", "lines": [1, 1] },
+        { "path": "src/app/(dashboard)/dashboard/layout.tsx", "lines": [1, 1] }
+      ]
+    },
+    {
+      "text": "ORM: Drizzle ORM with PostgreSQL dialect via the `postgres` npm driver (not `pg` — pg is a listed dependency but Drizzle does not use it).",
+      "basis": "observed",
+      "evidence": [
+        { "path": "src/db/index.ts", "lines": [2, 3] },
+        { "path": "drizzle.config.ts", "lines": [6, 6], "note": "dialect: 'postgresql'" },
+        { "path": "package.json", "lines": [83, 83], "note": "\"postgres\": \"^3.4.4\"" }
+      ]
+    },
+    {
+      "text": "Auth: Clerk (@clerk/nextjs ^5.2.3) — handles sign-in, sign-up, OAuth, and session; root layout wraps the app in ClerkProvider.",
+      "basis": "observed",
+      "evidence": [
+        { "path": "package.json", "lines": [30, 30] },
+        { "path": "src/app/layout.tsx", "lines": [75, 99] }
+      ]
+    },
+    {
+      "text": "Payments: Stripe (stripe ^16.2.0 + @stripe/react-stripe-js) for checkout and seller subscriptions; webhook handler at api/webhooks/stripe.",
+      "basis": "observed",
+      "evidence": [
+        { "path": "package.json", "lines": [101, 101] },
+        { "path": "src/app/api/webhooks/stripe/route.ts", "lines": [1, 30] }
+      ]
+    },
+    {
+      "text": "File uploads: UploadThing (uploadthing ^6.13.2); CDN remote-pattern configured for utfs.io in next.config.js.",
+      "basis": "observed",
+      "evidence": [
+        { "path": "package.json", "lines": [104, 104] },
+        { "path": "next.config.js", "lines": [12, 16] }
+      ]
+    },
+    {
+      "text": "Caching/rate-limiting: Upstash Redis (@upstash/redis ^1.32.0, @upstash/ratelimit ^1.2.1).",
+      "basis": "observed",
+      "evidence": [
+        { "path": "package.json", "lines": [64, 65] },
+        { "path": "src/env.js", "lines": [22, 23] }
+      ]
+    },
+    {
+      "text": "Email: Resend (resend ^3.4.0) with React Email components for transactional emails including newsletter.",
+      "basis": "observed",
+      "evidence": [
+        { "path": "package.json", "lines": [98, 98] },
+        { "path": "src/env.js", "lines": [11, 12] }
+      ]
+    },
+    {
+      "text": "Content: Contentlayer (^0.3.4) processes MDX from src/content/ for the blog; integrated via withContentlayer wrapper in next.config.js.",
+      "basis": "observed",
+      "evidence": [
+        { "path": "next.config.js", "lines": [1, 1] },
+        { "path": "package.json", "lines": [70, 70] }
+      ]
+    },
+    {
+      "text": "UI: shadcn/ui components built on Radix UI primitives + Tailwind CSS; cn() utility for conditional class merging.",
+      "basis": "observed",
+      "evidence": [
+        { "path": "package.json", "lines": [34, 54] }
+      ]
+    },
+    {
+      "text": "Environment validation: @t3-oss/env-nextjs validates all env vars at startup via src/env.js (must import with .js extension).",
+      "basis": "observed",
+      "evidence": [
+        { "path": "src/env.js", "lines": [9, 38] },
+        { "path": "package.json", "lines": [59, 59] }
+      ]
+    }
+  ],
+  "entryPoints": [
+    {
+      "text": "Root HTML shell and global providers (ClerkProvider, ThemeProvider, Toaster, Analytics) are set up in src/app/layout.tsx.",
+      "basis": "observed",
+      "evidence": [
+        { "path": "src/app/layout.tsx", "lines": [75, 99] }
+      ]
+    },
+    {
+      "text": "Public storefront (home page) at src/app/(lobby)/page.tsx — fetches featured products, categories, stores with Suspense boundaries.",
+      "basis": "observed",
+      "evidence": [
+        { "path": "src/app/(lobby)/page.tsx", "lines": [10, 32] }
+      ]
+    },
+    {
+      "text": "Clerk middleware protects only /dashboard(.*); all other routes are public. Signed-out users are redirected to /signin.",
+      "basis": "observed",
+      "evidence": [
+        { "path": "src/middleware.ts", "lines": [3, 11] }
+      ]
+    },
+    {
+      "text": "Stripe webhook entry point at src/app/api/webhooks/stripe/route.ts handles payment and subscription events.",
+      "basis": "observed",
+      "evidence": [
+        { "path": "src/app/api/webhooks/stripe/route.ts", "lines": [1, 30] }
+      ]
+    }
+  ],
+  "keyFacts": [
+    {
+      "text": "README states 'Database on PlanetScale' but source code uses PostgreSQL (postgres driver, Drizzle postgresql dialect). PlanetScale claim is outdated.",
+      "basis": "observed",
+      "evidence": [
+        { "path": "README.md", "lines": [31, 31], "note": "README says PlanetScale" },
+        { "path": "src/db/index.ts", "lines": [2, 3], "note": "code uses postgres driver" },
+        { "path": "drizzle.config.ts", "lines": [6, 6], "note": "dialect: postgresql" }
+      ]
+    },
+    {
+      "text": "README marks 'Checkout with Stripe Checkout' as not yet implemented (unchecked box), though a checkout route group and Stripe payment form exist in source.",
+      "basis": "observed",
+      "evidence": [
+        { "path": "README.md", "lines": [36, 36] },
+        { "path": "src/app/(checkout)/checkout/[storeId]/page.tsx", "lines": [1, 40] }
+      ]
+    },
+    {
+      "text": "next.config.js sets eslint.ignoreDuringBuilds and typescript.ignoreBuildErrors to true — CI validation must be run separately via pnpm check.",
+      "basis": "observed",
+      "evidence": [
+        { "path": "next.config.js", "lines": [21, 22] }
+      ]
+    },
+    {
+      "text": "The project has no automated tests — no test runner (Jest, Vitest, Playwright) is configured and no test script exists in package.json.",
+      "basis": "observed",
+      "evidence": [
+        { "path": "package.json", "lines": [6, 27] }
+      ]
+    },
+    {
+      "text": "DB schema defines 13 tables: addresses, carts, categories, customers, notifications, orders, payments, products, stocks, stores, subcategories, tags, variants — all re-exported from src/db/schema/index.ts.",
+      "basis": "observed",
+      "evidence": [
+        { "path": "src/db/schema/index.ts", "lines": [1, 13] }
+      ]
+    }
+  ]
+}
