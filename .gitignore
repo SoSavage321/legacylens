@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.env
+.env.*
+*.mp4
+*.mov
+.DS_Store
+Thumbs.db
