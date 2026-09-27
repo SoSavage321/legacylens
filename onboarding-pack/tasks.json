@@ -4,9 +4,9 @@
     "mock": false,
     "repoCommit": "e954d54379a7a6f798d3f49ffc6664449220adfc",
     "generatedBy": {
-      "member": "LegacyLens Onboarding Analyst",
-      "bobTask": "Propose 3 candidate first tasks for a new contributor, plus up to 2 rejected tasks",
-      "mode": "LegacyLens Onboarding Analyst"
+      "member": "M1",
+      "bobTask": "B16",
+      "mode": "legacylens"
     }
   },
   "candidates": [
@@ -24,8 +24,8 @@
         "pnpm format:check"
       ],
       "externalDependencyRisk": "none — pure string literal change, no external service involved",
-      "decision": "selected",
-      "reason": "Single character change corrects a misspelled fallback string ('Bytest' → 'Bytes') in the formatBytes utility. Affects one file, one line. The function has no side effects, touches no DB or auth. All three CI checks (lint, typecheck, format) pass with only .env.example placeholder values copied to .env.local.",
+      "decision": "rejected",
+      "reason": "The typo ('Bytest') is in the accurateSizes branch of formatBytes, which is dead code — every call site in the repo uses the default sizeType='normal', so the accurate branch is never reached. Correcting the string has no visible effect for any user or any test.",
       "evidence": [
         {
           "path": "src/lib/utils.ts",
@@ -123,7 +123,7 @@
         "pnpm format:check"
       ],
       "externalDependencyRisk": "none — Zod schema change only; no DB or auth call needed",
-      "decision": "selected",
+      "decision": "rejected",
       "reason": "createStoreSchema uses z.string().min(3).max(50) without message strings (lines 7, 39). The parallel createProductSchema (product.ts line 4) already provides a message. Adding matching messages improves UX consistency and is a one-file, zero-runtime-dependency change fully validated by pnpm typecheck.",
       "evidence": [
         {
@@ -147,15 +147,135 @@
           "note": "CI copies .env.example then runs lint — no real secrets needed to validate"
         }
       ]
+    },
+    {
+      "id": "fix-payment-status-colours",
+      "title": "Fix payment status badge class names",
+      "workflowId": "checkout_payment",
+      "files": [
+        "src/lib/checkout.ts"
+      ],
+      "risk": "low",
+      "validation": [
+        "pnpm typecheck",
+        "SKIP_ENV_VALIDATION=1 pnpm lint",
+        "pnpm format:check"
+      ],
+      "externalDependencyRisk": "none — pure string template fix, no external service involved",
+      "decision": "selected",
+      "reason": "getStripePaymentStatusColor builds class names as `${bg}-red` and `${bg}-yellow` where bg is already 'bg-600', producing 'bg-600-red' and 'bg-600-yellow' — words in the wrong order, classes that do not exist in Tailwind. Only the 'succeeded' branch uses the correct pattern `bg-green-${shade}`. Canceled and processing badges therefore render with no background colour. The fix is one file, provable without secrets, and the broken pattern is directly visible in source.",
+      "evidence": [
+        {
+          "path": "src/lib/checkout.ts",
+          "lines": [38, 41],
+          "note": "Line 38: const bg = `bg-${shade}` builds 'bg-600'. Lines 41-42: [`${bg}-red`] and [`${bg}-yellow`] become 'bg-600-red' / 'bg-600-yellow' — invalid Tailwind classes"
+        },
+        {
+          "path": "src/lib/checkout.ts",
+          "lines": [49, 49],
+          "note": "Line 49: [`bg-green-${shade}`] correctly produces 'bg-green-600' — establishes the correct pattern the other branches must follow"
+        }
+      ]
     }
   ],
-  "selectedId": "fix-formatbytes-typo",
+  "selectedId": "fix-payment-status-colours",
   "blastRadius": {
-    "changedFiles": [],
-    "directDependents": [],
-    "indirectImpact": [],
-    "risks": [],
-    "validation": [],
-    "rollback": ""
+    "changedFiles": [
+      "src/lib/checkout.ts"
+    ],
+    "directDependents": [
+      {
+        "path": "src/components/tables/orders-table.tsx",
+        "lines": [11, 71],
+        "note": "Imports and calls getStripePaymentStatusColor at line 11 (import) and line 71 (call site)"
+      },
+      {
+        "path": "src/components/tables/purchases-table.tsx",
+        "lines": [12, 69],
+        "note": "Imports and calls getStripePaymentStatusColor at line 12 (import) and line 69 (call site)"
+      }
+    ],
+    "indirectImpact": [
+      {
+        "text": "Any page that renders orders-table or purchases-table will show corrected badge colours after the fix — visual-only change, no data or logic impact",
+        "basis": "inferred",
+        "evidence": [
+          {
+            "path": "src/components/tables/orders-table.tsx",
+            "lines": [71, 71],
+            "note": "getStripePaymentStatusColor result is passed directly to className — purely presentational"
+          }
+        ]
+      }
+    ],
+    "risks": [
+      {
+        "text": "Typo in a replacement class name (e.g. 'bg-red-60' instead of 'bg-red-600') would silently produce another non-existent Tailwind class — verify by inspecting the built CSS or running a Tailwind class check",
+        "basis": "inferred",
+        "evidence": [
+          {
+            "path": "src/lib/checkout.ts",
+            "lines": [38, 50],
+            "note": "All three class names are constructed by string interpolation; any digit or letter error would be invisible to tsc and ESLint"
+          }
+        ]
+      },
+      {
+        "text": "An unused intermediate variable (e.g. leaving `const bg` in place while switching to inline template literals) would add a lint warning about no-unused-vars",
+        "basis": "inferred",
+        "evidence": [
+          {
+            "path": "src/lib/checkout.ts",
+            "lines": [38, 38],
+            "note": "const bg = `bg-${shade}` — if the fix inlines the pattern, this variable must be removed or reused to avoid a lint warning"
+          }
+        ]
+      }
+    ],
+    "validation": [
+      {
+        "command": "manual proof: trace getStripePaymentStatusColor output for each status",
+        "env": "none",
+        "expected": "canceled => bg-red-600, processing => bg-yellow-600, succeeded => bg-green-600",
+        "result": "pass",
+        "log": "canceled => bg-red-600, processing => bg-yellow-600, succeeded => bg-green-600"
+      },
+      {
+        "command": "pnpm typecheck",
+        "env": "SKIP_ENV_VALIDATION=1",
+        "expected": "exit 0",
+        "result": "pass",
+        "log": "exit 0"
+      },
+      {
+        "command": "SKIP_ENV_VALIDATION=1 pnpm lint",
+        "env": "SKIP_ENV_VALIDATION=1",
+        "expected": "0 errors, warnings same count as main branch",
+        "result": "pass",
+        "log": "0 errors, 52 warnings (same as main)"
+      },
+      {
+        "command": "pnpm format:check (src/lib/checkout.ts only)",
+        "env": "none",
+        "expected": "exit 0, no formatting differences in changed file",
+        "result": "pass",
+        "log": "prettier check on src/lib/checkout.ts: pass"
+      },
+      {
+        "command": "pnpm format:check",
+        "env": "none",
+        "expected": "exit 0 across all repo files",
+        "result": "fail_env",
+        "log": "Fails on Windows for all 318 files due to CRLF line endings — same failure exists on main branch; not caused by this change"
+      },
+      {
+        "command": "Tailwind build class scan",
+        "env": "none",
+        "expected": ".bg-red-600 found in output CSS, bg-600-red not found",
+        "result": "pass",
+        "log": ".bg-red-600 found 1, bg-600-red found 0"
+      }
+    ],
+    "rollback": "Close the PR or run: git revert <merge-commit-sha>. No DB migration, no schema change, no external service to update."
   }
 }
