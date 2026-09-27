@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { getPack } from "../lib/pack";
 import { FILES } from "../lib/evidence";
 import { useEvidence } from "./Evidence";
+import { BobOrb, useBob } from "./Bob";
 import {
   IconArchitecture,
   IconFile,
@@ -16,7 +17,7 @@ const pack = getPack();
 
 interface Item {
   id: string;
-  group: "Screens" | "Architecture" | "Workflows" | "Reading path" | "Files";
+  group: "Ask Bob" | "Screens" | "Architecture" | "Workflows" | "Reading path" | "Files";
   label: string;
   hint?: string;
   icon: ReactNode;
@@ -35,6 +36,7 @@ export function CommandPalette({
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const { open } = useEvidence();
+  const bob = useBob();
 
   useEffect(() => {
     const prev = document.activeElement as HTMLElement | null;
@@ -108,8 +110,26 @@ export function CommandPalette({
     const filtered = q
       ? items.filter((i) => `${i.label} ${i.hint ?? ""}`.toLowerCase().includes(q))
       : items.filter((i) => i.group !== "Files").concat(items.filter((i) => i.group === "Files").slice(0, 6));
-    return filtered.slice(0, 40);
-  }, [items, query]);
+    // Anything typed can also go straight to Bob as a question
+    const askBob: Item[] = q
+      ? [
+          {
+            id: "ask-bob",
+            group: "Ask Bob",
+            label: `Ask Bob: “${query.trim()}”`,
+            hint: "Answer from verified source",
+            icon: <BobOrb size={16} />,
+            run: () => {
+              onClose();
+              bob.open(query.trim());
+            },
+          },
+        ]
+      : [];
+    // Questions read better as Bob answers; plain names as jumps
+    const looksLikeQuestion = /\?|^(how|what|where|why|which|who|when|walk|explain|can|does|is)\b/i.test(q);
+    return (looksLikeQuestion || filtered.length === 0 ? [...askBob, ...filtered] : [...filtered, ...askBob]).slice(0, 40);
+  }, [items, query, bob, onClose]);
 
   useEffect(() => setActive(0), [query]);
 

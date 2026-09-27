@@ -14,6 +14,7 @@ import {
   Tag,
 } from "@/src/components/ui";
 import { IconKey } from "@/src/components/Icons";
+import { BobTour } from "@/src/components/Bob";
 
 const pack = getPack();
 const required = pack.quiz.readiness.requiredWorkflowIds;
@@ -304,6 +305,14 @@ export default function WorkflowsScreen({
           )}
         </div>
       </section>
+
+      <BobTour
+        workflowId={wf.id}
+        name={wf.name}
+        steps={wf.steps}
+        order={order}
+        onSelect={(o) => select(wf.id, o)}
+      />
 
       <div className="wf-layout">
         <WorkflowStepper wf={wf} active={order} visited={visited} onSelect={(o) => select(wf.id, o)} />

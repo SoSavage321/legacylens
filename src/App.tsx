@@ -5,6 +5,7 @@ import type { ParsedRepo } from "@/src/lib/repository";
 import { ProgressProvider } from "@/src/lib/progress";
 import { EvidenceProvider } from "@/src/components/Evidence";
 import { AppShell } from "@/src/components/AppShell";
+import { BobProvider } from "@/src/components/Bob";
 import RepoEntryScreen from "@/src/screens/RepoEntry";
 import UnsupportedScreen from "@/src/screens/Unsupported";
 import OverviewScreen from "@/src/screens/Overview";
@@ -17,7 +18,10 @@ import SettingsScreen from "@/src/screens/Settings";
 import "./index.css";
 
 export default function App() {
-  const [appView, setAppView] = useState<AppView>("repo-entry");
+  // A deep link or reload inside the journey (#/workflows/…) resumes it instead of restarting at the landing page
+  const [appView, setAppView] = useState<AppView>(() =>
+    /^#\/\w/.test(window.location.hash) ? "onboarding" : "repo-entry"
+  );
   const [selectedRepo, setSelectedRepo] = useState<ParsedRepo | null>(null);
 
   const [route, navigate] = useHashRoute();
@@ -40,6 +44,7 @@ export default function App() {
   }
 
   function handleTryAnother() {
+    history.replaceState(null, "", window.location.pathname);
     setSelectedRepo(null);
     setAppView("repo-entry");
   }
@@ -67,6 +72,7 @@ export default function App() {
   return (
     <ProgressProvider>
       <EvidenceProvider>
+        <BobProvider screen={screen} navigate={navigate}>
         <AppShell
           screen={screen}
           navigate={navigate}
@@ -74,7 +80,7 @@ export default function App() {
         >
           {screen === "overview" && <OverviewScreen navigate={navigate} />}
           {screen === "architecture" && (
-            <ArchitectureScreen layerId={params[0]} navigate={navigate} />
+            <ArchitectureScreen layerId={params[0]} params={params} navigate={navigate} />
           )}
           {screen === "workflows" && (
             <WorkflowsScreen params={params} navigate={navigate} />
@@ -86,6 +92,7 @@ export default function App() {
           {screen === "evidence" && <EvidenceLedgerScreen />}
           {screen === "settings" && <SettingsScreen />}
         </AppShell>
+        </BobProvider>
       </EvidenceProvider>
     </ProgressProvider>
   );

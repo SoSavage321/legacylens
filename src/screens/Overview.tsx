@@ -12,8 +12,9 @@ import {
   verificationTotal,
 } from "@/src/lib/evidence";
 import { EvidenceButton, FileReference, useEvidence } from "@/src/components/Evidence";
-import { ConfidenceBadge, PrimaryButton, SecondaryButton, StatusIndicator, Tag } from "@/src/components/ui";
-import { IconEvidence, IconExternal, IconWarn } from "@/src/components/Icons";
+import { ConfidenceBadge, PrimaryButton, SecondaryButton, StatusIndicator } from "@/src/components/ui";
+import { IconEvidence, IconWarn } from "@/src/components/Icons";
+import { BobBriefing, BobBuildTimeline } from "@/src/components/BobBriefing";
 
 const pack = getPack();
 const { overview } = pack;
@@ -115,28 +116,8 @@ export default function OverviewScreen({ navigate }: { navigate: (to: string) =>
 
   return (
     <div className="overview">
-      <section className="ov-hero">
-        <div className="ov-hero-main">
-          <div className="eyebrow">Investigation · {overview.repo.name}</div>
-          <h1 className="ov-title">Let's understand this repository.</h1>
-          <p className="ov-lede">Get oriented, trace the important workflows, and reach your first safe change.</p>
-        </div>
 
-        <div className="repo-card">
-          <div className="repo-card-top">
-            <span className="repo-card-name">{overview.repo.name.toUpperCase()}</span>
-            <Tag tone="neutral">{overview.repo.licence}</Tag>
-          </div>
-          <div className="repo-card-kind">Legacy e-commerce application</div>
-          <p className="repo-card-desc">{overview.oneLine}</p>
-          <div className="repo-card-meta">
-            <a href={overview.repo.url} target="_blank" rel="noreferrer" className="source-link">
-              {overview.repo.url.replace(/^https?:\/\//, "")} <IconExternal size={12} />
-            </a>
-            <span className="mono dim">@ {SHORT_COMMIT}</span>
-          </div>
-        </div>
-      </section>
+      <BobBriefing />
 
       {/* ── The journey ───────────────────────────────────────────── */}
       <section className="journey" aria-labelledby="journey-title">
@@ -330,6 +311,7 @@ export default function OverviewScreen({ navigate }: { navigate: (to: string) =>
           </ul>
         </section>
       </div>
+      <BobBuildTimeline />
     </div>
   );
 }

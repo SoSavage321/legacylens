@@ -17,6 +17,8 @@ import {
 } from "./Icons";
 import { ProgressRing, StatusIndicator, type Status } from "./ui";
 import { CommandPalette } from "./CommandPalette";
+import { BobOrb, useBob } from "./Bob";
+import { useSpeaking } from "../lib/voice";
 
 const pack = getPack();
 
@@ -211,6 +213,8 @@ function TopBar({
   navigate: (to: string) => void;
 }) {
   const { readiness } = useProgress();
+  const bob = useBob();
+  const speaking = useSpeaking();
   const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
   return (
     <header className="topbar">
@@ -226,6 +230,16 @@ function TopBar({
         <IconSearch size={15} />
         <span className="topbar-search-text">Search files, claims, workflows…</span>
         <kbd>{isMac ? "⌘" : "Ctrl"} K</kbd>
+      </button>
+
+      <button
+        className={`topbar-bob ${bob.isOpen ? "is-open" : ""}`}
+        onClick={bob.toggle}
+        aria-expanded={bob.isOpen}
+        title="Ask Bob about this codebase (Ctrl+J)"
+      >
+        <BobOrb size={22} state={speaking ? "speaking" : "idle"} />
+        <span>Ask Bob</span>
       </button>
 
       <button
