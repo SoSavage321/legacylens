@@ -11,6 +11,22 @@ export interface LearnProgress {
   answers: Record<string, string>;
   /** workflow ids the user has run */
   completedWorkflows: WorkflowId[];
+  /** architecture layer ids the user has inspected */
+  exploredLayers: string[];
+  /** first-task checklist items the user has confirmed */
+  taskSteps: string[];
+}
+
+const EMPTY_PROGRESS: LearnProgress = {
+  readSteps: [],
+  answers: {},
+  completedWorkflows: [],
+  exploredLayers: [],
+  taskSteps: [],
+};
+
+export function emptyProgress(): LearnProgress {
+  return { ...EMPTY_PROGRESS };
 }
 
 const STORAGE_KEY = "legacylens_progress";
@@ -18,19 +34,28 @@ const STORAGE_KEY = "legacylens_progress";
 export function loadProgress(): LearnProgress {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw) as LearnProgress;
+    // Merge over defaults so progress saved by older builds stays loadable
+    if (raw) return { ...EMPTY_PROGRESS, ...(JSON.parse(raw) as Partial<LearnProgress>) };
   } catch {
     // ignore
   }
-  return { readSteps: [], answers: {}, completedWorkflows: [] };
+  return emptyProgress();
 }
 
 export function saveProgress(p: LearnProgress): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
+  } catch {
+    // storage unavailable (private mode) — progress stays in memory
+  }
 }
 
 export function resetProgress(): void {
-  localStorage.removeItem(STORAGE_KEY);
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // ignore
+  }
 }
 
 // ---------------------------------------------------------------------------

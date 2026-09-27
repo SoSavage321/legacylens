@@ -1,65 +1,33 @@
-import { useState } from "react";
-import { getPack, shortCommit, repoName } from "@/src/lib/pack";
+import { useHashRoute } from "@/src/lib/router";
+import { ProgressProvider } from "@/src/lib/progress";
+import { EvidenceProvider } from "@/src/components/Evidence";
+import { AppShell } from "@/src/components/AppShell";
 import OverviewScreen from "@/src/screens/Overview";
 import ArchitectureScreen from "@/src/screens/Architecture";
+import WorkflowsScreen from "@/src/screens/Workflows";
 import LearnScreen from "@/src/screens/Learn";
 import FirstTaskScreen from "@/src/screens/FirstTask";
+import EvidenceLedgerScreen from "@/src/screens/EvidenceLedger";
+import SettingsScreen from "@/src/screens/Settings";
 import "./index.css";
 
-type Tab = "overview" | "architecture" | "learn" | "firsttask";
-
-const TABS: { id: Tab; label: string }[] = [
-  { id: "overview", label: "Overview" },
-  { id: "architecture", label: "Architecture" },
-  { id: "learn", label: "Learn" },
-  { id: "firsttask", label: "First Task" },
-];
-
 export default function App() {
-  const [activeTab, setActiveTab] = useState<Tab>("overview");
-  const pack = getPack();
-  const commit = shortCommit(pack);
-  const repo = repoName(pack);
-  const isMock = pack.overview.meta.mock;
+  const [route, navigate] = useHashRoute();
+  const { screen, params } = route;
 
   return (
-    <div className="app">
-      {isMock && (
-        <div className="mock-banner" role="alert">
-          MOCK DATA
-        </div>
-      )}
-
-      <header className="app-header">
-        <span className="app-title">
-          LegacyLens
-          <span className="app-title-sep"> · </span>
-          <span className="app-title-repo">{repo}</span>
-          <span className="app-title-sep"> @ </span>
-          <code className="app-title-commit">{commit}</code>
-        </span>
-      </header>
-
-      <nav className="tab-nav" role="tablist">
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            role="tab"
-            aria-selected={activeTab === tab.id}
-            className={`tab-btn${activeTab === tab.id ? " tab-btn--active" : ""}`}
-            onClick={() => setActiveTab(tab.id)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </nav>
-
-      <main className="app-main">
-        {activeTab === "overview" && <OverviewScreen overview={pack.overview} />}
-        {activeTab === "architecture" && <ArchitectureScreen architecture={pack.architecture} />}
-        {activeTab === "learn" && <LearnScreen />}
-        {activeTab === "firsttask" && <FirstTaskScreen tasks={pack.tasks} />}
-      </main>
-    </div>
+    <ProgressProvider>
+      <EvidenceProvider>
+        <AppShell screen={screen} navigate={navigate}>
+          {screen === "overview" && <OverviewScreen navigate={navigate} />}
+          {screen === "architecture" && <ArchitectureScreen layerId={params[0]} navigate={navigate} />}
+          {screen === "workflows" && <WorkflowsScreen params={params} navigate={navigate} />}
+          {screen === "learn" && <LearnScreen stepId={params[0]} navigate={navigate} />}
+          {screen === "task" && <FirstTaskScreen navigate={navigate} />}
+          {screen === "evidence" && <EvidenceLedgerScreen />}
+          {screen === "settings" && <SettingsScreen />}
+        </AppShell>
+      </EvidenceProvider>
+    </ProgressProvider>
   );
 }
