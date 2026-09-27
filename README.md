@@ -511,7 +511,7 @@ Imports use the `@/` alias, which maps to the repository root (for example `@/sr
 ## 13. License
 
 LegacyLens is released under the [MIT License](LICENSE).
-Copyright © 2026 Gift Onwusaka.
+Copyright © 2026 LegacyLens.
 
 The analysed repository, **skateshop**, is also MIT licensed.
 Source: [https://github.com/sadmann7/skateshop](https://github.com/sadmann7/skateshop)
