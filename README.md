@@ -98,6 +98,10 @@ flowchart LR
 
 ## 4. Core User Journey
 
+LegacyLens opens on a **repository selection screen** where the user pastes a GitHub repository URL. The app validates and normalises the URL (trailing `/` and `.git` are stripped). For the current demo, only the verified Skateshop repository is supported — entering any other URL shows an honest "analysis unavailable" state rather than Skateshop data. Repository selection is centralised in `src/lib/repository.ts`; no repository-specific checks are scattered through the onboarding screens.
+
+Once the supported Skateshop URL is entered, a short transition (checking URL → loading pack → verifying data → preparing journey) leads into the hash-routed onboarding experience described below. An **"Analyze another repository"** link in the sidebar returns to the selection screen at any time without resetting the onboarding progress.
+
 The app is a hash-routed SPA with seven screens: five **Investigation** screens (Overview, Architecture, Workflows, Learn, First Task) and two utility screens (Evidence, Settings). The sidebar shows each screen's milestone status. The top bar shows the live readiness score ("N% understood") and a search button.
 
 The journey is tracked as **six milestones across four phases**:
@@ -494,7 +498,7 @@ Imports use the `@/` alias, which maps to the repository root (for example `@/sr
 
 ## 12. Known Limitations
 
-- **Single target repository.** The pack, the architecture node positions (`POSITIONS` in `Architecture.tsx`) and some copy are specific to Skateshop. Pointing LegacyLens at another repository means generating a new pack (the schema is generic) and adjusting that layout map; unknown layers fall back to an elliptical layout.
+- **Single target repository.** The pack, the architecture node positions (`POSITIONS` in `Architecture.tsx`) and some copy are specific to Skateshop. The repository selection screen accepts any GitHub URL but currently only resolves the Skateshop pack. Pointing LegacyLens at another repository requires generating a new onboarding pack offline (the schema is generic) and adjusting the architecture layout map; entering any other URL shows an explicit "analysis unavailable" screen.
 - **Verification proves citations exist, not that claims are correct.** A resolved citation means the file and line range exist at the commit. Whether the claim reads the code correctly is left to the developer, which is why every claim opens its source.
 - **Blast radius is partial.** `tasks.json` `blastRadius` is empty, so direct dependents of the changed code are not listed.
 - **Progress is self-reported and local.** Checklists and "reviewed" marks are honour-system, stored in one browser, and not synced.

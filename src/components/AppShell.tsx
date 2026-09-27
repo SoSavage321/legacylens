@@ -62,10 +62,12 @@ function navStatus(item: NavItem, milestones: Milestone[]): Status {
 export function AppShell({
   screen,
   navigate,
+  onAnalyzeAnother,
   children,
 }: {
   screen: Screen;
   navigate: (to: string) => void;
+  onAnalyzeAnother: () => void;
   children: ReactNode;
 }) {
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -102,7 +104,7 @@ export function AppShell({
           ! MOCK DATA — this onboarding pack has not been generated from the repository
         </div>
       )}
-      <Sidebar screen={screen} navigate={navigate} />
+      <Sidebar screen={screen} navigate={navigate} onAnalyzeAnother={onAnalyzeAnother} />
       <TopBar screen={screen} onSearch={() => setPaletteOpen(true)} navigate={navigate} />
       <main id="main" className="main" tabIndex={-1}>
         <div className="main-inner" key={screen}>
@@ -114,7 +116,15 @@ export function AppShell({
   );
 }
 
-function Sidebar({ screen, navigate }: { screen: Screen; navigate: (to: string) => void }) {
+function Sidebar({
+  screen,
+  navigate,
+  onAnalyzeAnother,
+}: {
+  screen: Screen;
+  navigate: (to: string) => void;
+  onAnalyzeAnother: () => void;
+}) {
   const { milestones } = useProgress();
   return (
     <aside className="sidebar" aria-label="Primary">
@@ -176,6 +186,16 @@ function Sidebar({ screen, navigate }: { screen: Screen; navigate: (to: string) 
             );
           })}
         </ul>
+        <div className="sidebar-analyze-another">
+          <button
+            type="button"
+            className="btn btn--secondary btn--sm sidebar-analyze-btn"
+            onClick={onAnalyzeAnother}
+            title="Return to repository selection"
+          >
+            ← Analyze another repository
+          </button>
+        </div>
       </nav>
     </aside>
   );

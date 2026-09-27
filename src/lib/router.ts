@@ -49,3 +49,15 @@ export function useHashRoute(): [Route, (to: string) => void] {
 
   return [route, navigate];
 }
+
+// ---------------------------------------------------------------------------
+// App-level view state (above the hash router)
+// ---------------------------------------------------------------------------
+
+/**
+ * The top-level view state controls whether the user sees:
+ *   "repo-entry"   — the repository input / landing screen
+ *   "unsupported"  — the honest "no pack for this repo" screen
+ *   "onboarding"   — the existing hash-routed onboarding experience
+ */
+export type AppView = "repo-entry" | "unsupported" | "onboarding";
